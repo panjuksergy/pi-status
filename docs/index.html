@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="uk">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Статус сервісу</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--fg:#1c1e21;--mut:#6b7280;--line:#e5e7eb;--ok:#059669;--warn:#d97706;--bad:#dc2626;--info:#2563eb}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#181b21;--fg:#e6e8eb;--mut:#8b93a1;--line:#2a2f38;--ok:#34d399;--warn:#fbbf24;--bad:#f87171;--info:#60a5fa}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 system-ui,sans-serif}
+main{max-width:640px;margin:auto;padding:24px 16px 48px;display:grid;gap:14px}
+h1{margin:0;font-size:22px}
+.card{background:var(--card);border-radius:14px;padding:18px}
+.banner{border-left:6px solid var(--c,var(--mut))}
+.banner h2{margin:0 0 6px;font-size:20px;color:var(--c)}
+.banner p{margin:4px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.mut{color:var(--mut);font-size:14px}
+.row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}.row b{font-weight:600}
+.strip{display:flex;gap:1px;height:34px;margin:10px 0 6px}
+.strip i{flex:1;border-radius:2px;background:var(--line)}
+h3{margin:0 0 6px;font-size:14px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+</style>
+<main>
+<h1 id="title"></h1>
+<div class="card banner" id="banner"><h2>…</h2></div>
+<div class="card"><h3 id="hsvc"></h3><div id="svc"></div></div>
+<div class="card"><h3 id="hup"></h3><div class="strip" id="strip"></div>
+<div class="mut" id="uptime"></div></div>
+<div class="card"><h3 id="hev"></h3><div id="events"></div></div>
+<p class="mut" id="checked"></p>
+</main>
+<script>
+// Where the checker (.github/workflows/status.yml in the pi-status repo) publishes its result.
+const DATA = 'https://raw.githubusercontent.com/panjuksergy/pi-status/status-data/status.json';
+const SERVICES = {sms: {uk: 'SMS-ретранслятор', en: 'SMS relay'}, split: {uk: 'Розділ чеків і гаманець', en: 'Receipt splitting and wallet'}};
+const T = {
+  uk: {title: 'Статус сервісу', hsvc: 'Сервіси', hup: 'Останні 7 днів', hev: 'Історія', up: 'Усе працює', maint: 'Йде оновлення',
+    maintText: 'Сервіс оновлюється і скоро повернеться. Зазвичай це кілька хвилин.', part: 'Частина сервісів не відповідає',
+    partText: 'Ми вже бачимо проблему і працюємо над нею.', annDown: 'Сервіс тимчасово недоступний',
+    annSince: 'Повідомлено', unplanned: 'Сервер зараз недоступний',
+    unplannedText: 'Це не планові роботи: ми не оголошували зупинку. Схоже, проблема на боці сервера (світло, мережа або сам пристрій). Ми вже про це знаємо й відновлюємо роботу. Нічого робити не потрібно: усі ваші дані збережені, просто спробуйте пізніше.',
+    note: 'Повідомлення від команди', upShort: 'працює', downShort: 'не відповідає', uptime: p => `Доступність за 7 днів: ${p}%`,
+    checked: t => `Остання перевірка: ${t}. Сторінка оновлюється сама.`, noData: 'Даних ще немає.', stale: 'Перевірка давно не виконувалась, статус міг змінитись.',
+    states: {up: 'працює', maintenance: 'оновлення', partial: 'частково', down: 'недоступний'}, noEvents: 'Подій ще немає.'},
+  en: {title: 'Service status', hsvc: 'Services', hup: 'Last 7 days', hev: 'History', up: 'All systems operational', maint: 'Update in progress',
+    maintText: 'The service is being updated and will be back shortly, usually within a few minutes.', part: 'Some services are not responding',
+    partText: 'We can see the problem and are working on it.', annDown: 'Service temporarily unavailable',
+    annSince: 'Announced', unplanned: 'The server is currently unavailable',
+    unplannedText: 'This is not planned maintenance: we did not announce a stop. The problem looks to be on the server side (power, network or the device itself). We already know and are restoring it. You do not need to do anything: your data is safe, please try again later.',
+    note: 'Message from the team', upShort: 'operational', downShort: 'not responding', uptime: p => `7-day uptime: ${p}%`,
+    checked: t => `Last check: ${t}. This page refreshes itself.`, noData: 'No data yet.', stale: 'The check has not run for a while, the status may have changed.',
+    states: {up: 'operational', maintenance: 'update', partial: 'partial', down: 'down'}, noEvents: 'No events yet.'},
+};
+const lang = (navigator.language || 'uk').startsWith('uk') || (navigator.language || '').startsWith('ru') ? 'uk' : 'en';
+const L = T[lang], $ = id => document.getElementById(id);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const when = t => new Date(t * 1000).toLocaleString(lang === 'uk' ? 'uk-UA' : undefined, {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'});
+const el = (tag, text, cls) => { const e = document.createElement(tag); e.textContent = text; if (cls) e.className = cls; return e; };
+document.documentElement.lang = lang;
+document.title = $('title').textContent = L.title;
+$('hsvc').textContent = L.hsvc; $('hup').textContent = L.hup; $('hev').textContent = L.hev;
+
+function banner(s) {
+  const b = $('banner'); b.textContent = '';
+  const inc = s.incident;
+  let color = 'var(--ok)', head = L.up, text = null;
+  if (s.state === 'down') {
+    color = 'var(--bad)';
+    if (inc) { head = L.annDown; text = inc.title; }          // the owner announced it: show the reason
+    else { head = L.unplanned; text = L.unplannedText; }       // nobody announced it: server problem
+  } else if (s.state === 'maintenance') { color = 'var(--info)'; head = L.maint; text = L.maintText; }
+  else if (s.state === 'partial') { color = 'var(--warn)'; head = L.part; text = L.partText; }
+  b.style.setProperty('--c', color);
+  b.append(el('h2', head));
+  if (text) b.append(el('p', text));
+  if (inc) {
+    if (s.state === 'down' && inc.details) b.append(el('p', inc.details));
+    else if (s.state !== 'down') { b.append(el('p', L.note + ': ' + inc.title)); if (inc.details) b.append(el('p', inc.details)); }
+    b.append(el('p', L.annSince + ': ' + when(Date.parse(inc.since) / 1000), 'mut'));
+  }
+}
+
+function strip(history) {
+  // 168 hourly cells: the worst state seen in that hour decides the colour.
+  const now = Date.now() / 1000, cells = Array(168).fill(null), rank = {up: 0, maintenance: 1, partial: 1, down: 2};
+  for (const [t, st] of history) {
+    const i = 167 - Math.floor((now - t) / 3600);
+    if (i >= 0 && i < 168 && (cells[i] === null || rank[st] > rank[cells[i]])) cells[i] = st;
+  }
+  const colors = {up: 'var(--ok)', maintenance: 'var(--info)', partial: 'var(--warn)', down: 'var(--bad)'};
+  $('strip').textContent = '';
+  cells.forEach((st, i) => { const c = document.createElement('i'); if (st) c.style.background = colors[st]; c.title = when(now - (167 - i) * 3600) + (st ? ' · ' + L.states[st] : ''); $('strip').append(c); });
+}
+
+async function load() {
+  let s;
+  try { s = await (await fetch(DATA, {cache: 'no-store'})).json(); }
+  catch (e) { $('banner').textContent = L.noData; return; }
+  banner(s);
+  $('svc').textContent = '';
+  for (const [name, up] of Object.entries(s.services || {})) {
+    const row = el('div', '', 'row');
+    row.append(el('span', (SERVICES[name] || {})[lang] || name), el('b', up ? L.upShort : L.downShort));
+    row.lastChild.style.color = up ? 'var(--ok)' : 'var(--bad)';
+    $('svc').append(row);
+  }
+  strip(s.history || []);
+  $('uptime').textContent = L.uptime(s.uptime7d);
+  $('events').textContent = '';
+  const evs = (s.events || []).slice().reverse();
+  if (!evs.length) $('events').append(el('p', L.noEvents, 'mut'));
+  for (const e of evs) {
+    const row = el('div', '', 'row');
+    row.append(el('span', when(e.t) + (e.reason ? ' · ' + e.reason : '')), el('b', L.states[e.state] || e.state));
+    $('events').append(row);
+  }
+  const age = Date.now() / 1000 - s.checked;
+  $('checked').textContent = L.checked(when(s.checked)) + (age > 1800 ? ' ' + L.stale : '');
+}
+load(); setInterval(load, 60000);
+</script>
+</html>
