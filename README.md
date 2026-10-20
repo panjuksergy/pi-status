@@ -22,7 +22,7 @@ If a deploy is running the page says «Йде оновлення»; if one bot's
 1. Create the repo as **public** (`panjuksergy/pi-status`) and push this folder to `main`.
 2. Settings → Pages → Deploy from a branch → `main` / `/docs`. The page is then at
    `https://panjuksergy.github.io/pi-status/`; give users that link (e.g. in each bot's description in @BotFather).
-3. Settings → Secrets and variables → Actions → Variables → `PI_URL` = the public address of the Pi without a
+3. Settings → Secrets and variables → Actions → `PI_URL` (a secret or a variable, both work) = the public address of the Pi without a
    trailing slash (the one that serves `/split/...`). It is only the address, which users know anyway.
 4. Issues → Labels → create `incident`. Then Actions → status → Run workflow once.
 

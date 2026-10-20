@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check the Pi and write status.json
         env:
-          PI_URL: ${{ vars.PI_URL }}
+          PI_URL: ${{ secrets.PI_URL || vars.PI_URL }}
           GITHUB_TOKEN: ${{ github.token }}
           STATUS_FILE: ${{ github.workspace }}/data/status.json
         run: |
