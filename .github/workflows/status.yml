@@ -18,7 +18,11 @@ concurrency:
 
 jobs:
   check:
+    # Issue events only matter for incident issues (only collaborators can add that label), so strangers
+    # opening issues can't trigger runs.
+    if: github.event_name != 'issues' || contains(github.event.issue.labels.*.name, 'incident')
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - name: Check the Pi and write status.json
