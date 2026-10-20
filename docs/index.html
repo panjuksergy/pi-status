@@ -17,8 +17,8 @@ h1{margin:0;font-size:22px}
 .mut{color:var(--mut);font-size:14px}
 .row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--line)}
 .row:first-of-type{border-top:0}.row b{font-weight:600}
-.strip{display:flex;gap:3px;height:34px;margin:10px 0 6px}
-.strip i{flex:1;border-radius:2px;background:var(--line)}
+.strip{display:flex;height:34px;margin:10px 0 6px;border-radius:6px;overflow:hidden;background:var(--line)}
+.strip i{flex:none;height:100%}
 h3{margin:0 0 6px;font-size:14px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
 </style>
 <main>
@@ -82,15 +82,34 @@ function banner(s) {
 }
 
 function strip(history) {
-  // 28 six-hour cells (GitHub cron runs are throttled, so hourly cells had gaps): the worst state seen decides the colour.
-  const now = Date.now() / 1000, cells = Array(28).fill(null), rank = {up: 0, maintenance: 1, partial: 1, down: 2};
-  for (const [t, st] of history) {
-    const i = 27 - Math.floor((now - t) / 21600);
-    if (i >= 0 && i < 28 && (cells[i] === null || rank[st] > rank[cells[i]])) cells[i] = st;
-  }
+  // One continuous timeline over 7 days. A check colours the time up to the next check, so throttled
+  // runs leave no gaps; only a hole longer than HOLE (or time before the first check) stays gray.
+  const HOLE = 3600, SPAN = 7 * 86400, now = Date.now() / 1000, from = now - SPAN;
   const colors = {up: 'var(--ok)', maintenance: 'var(--info)', partial: 'var(--warn)', down: 'var(--bad)'};
+  const h = history.filter(([t]) => t <= now).sort((x, y) => x[0] - y[0]);
+  const segs = [];
+  const add = (a, b, st) => {
+    a = Math.max(a, from); b = Math.min(b, now);
+    if (b <= a) return;
+    const last = segs[segs.length - 1];
+    if (last && last.st === st && last.b >= a - 1) last.b = b; else segs.push({a, b, st});
+  };
+  h.forEach(([t, st], i) => {
+    const next = i + 1 < h.length ? h[i + 1][0] : now;
+    add(t, Math.min(next, t + HOLE), st);
+    if (next - t > HOLE) add(t + HOLE, next, null);
+  });
+  if (!h.length) add(from, now, null);
+  else add(from, h[0][0], null);
+  segs.sort((x, y) => x.a - y.a);
   $('strip').textContent = '';
-  cells.forEach((st, i) => { const c = document.createElement('i'); if (st) c.style.background = colors[st]; c.title = when(now - (27 - i) * 21600) + (st ? ' · ' + L.states[st] : ''); $('strip').append(c); });
+  for (const g of segs) {
+    const c = document.createElement('i');
+    c.style.width = ((g.b - g.a) / SPAN * 100) + '%';
+    if (g.st) c.style.background = colors[g.st];
+    c.title = when(g.a) + ' – ' + when(g.b) + (g.st ? ' · ' + L.states[g.st] : '');
+    $('strip').append(c);
+  }
 }
 
 async function load() {
