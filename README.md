@@ -3,7 +3,8 @@
 Public status page for the pi-bots services. It lives in its own public repo on purpose: the bots' code
 (pi-bots) stays private, and this page has to work when the Pi is off.
 
-`.github/workflows/status.yml` runs every ~5 minutes, asks the Pi's public `/health` (served by the pi-bots
+`.github/workflows/status.yml` checks every 2 minutes (a run loops for ~50 minutes and starts the next run
+itself, because GitHub throttles plain cron to hours), asks the Pi's public `/health` (served by the pi-bots
 webhook: which bots answer, whether a deploy is running) and writes `status.json` to the `status-data` branch.
 `docs/index.html` (GitHub Pages) reads it and shows it in Ukrainian or English: current state, a 7-day uptime
 bar and the history.
@@ -28,4 +29,4 @@ If a deploy is running the page says «Йде оновлення»; if one bot's
 
 Keep nothing secret here: the repo is public, and `PI_URL` is the only thing it knows about the Pi.
 GitHub pauses scheduled workflows in a repo with no activity for 60 days; any push or issue resumes them.
-Scheduled runs can be delayed by several minutes; the page shows the time of the last check.
+The 15-minute cron only restarts the chain if it breaks; the page shows the time of the last check.
