@@ -17,7 +17,7 @@ h1{margin:0;font-size:22px}
 .mut{color:var(--mut);font-size:14px}
 .row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--line)}
 .row:first-of-type{border-top:0}.row b{font-weight:600}
-.strip{display:flex;gap:1px;height:34px;margin:10px 0 6px}
+.strip{display:flex;gap:3px;height:34px;margin:10px 0 6px}
 .strip i{flex:1;border-radius:2px;background:var(--line)}
 h3{margin:0 0 6px;font-size:14px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
 </style>
@@ -82,15 +82,15 @@ function banner(s) {
 }
 
 function strip(history) {
-  // 168 hourly cells: the worst state seen in that hour decides the colour.
-  const now = Date.now() / 1000, cells = Array(168).fill(null), rank = {up: 0, maintenance: 1, partial: 1, down: 2};
+  // 28 six-hour cells (GitHub cron runs are throttled, so hourly cells had gaps): the worst state seen decides the colour.
+  const now = Date.now() / 1000, cells = Array(28).fill(null), rank = {up: 0, maintenance: 1, partial: 1, down: 2};
   for (const [t, st] of history) {
-    const i = 167 - Math.floor((now - t) / 3600);
-    if (i >= 0 && i < 168 && (cells[i] === null || rank[st] > rank[cells[i]])) cells[i] = st;
+    const i = 27 - Math.floor((now - t) / 21600);
+    if (i >= 0 && i < 28 && (cells[i] === null || rank[st] > rank[cells[i]])) cells[i] = st;
   }
   const colors = {up: 'var(--ok)', maintenance: 'var(--info)', partial: 'var(--warn)', down: 'var(--bad)'};
   $('strip').textContent = '';
-  cells.forEach((st, i) => { const c = document.createElement('i'); if (st) c.style.background = colors[st]; c.title = when(now - (167 - i) * 3600) + (st ? ' · ' + L.states[st] : ''); $('strip').append(c); });
+  cells.forEach((st, i) => { const c = document.createElement('i'); if (st) c.style.background = colors[st]; c.title = when(now - (27 - i) * 21600) + (st ? ' · ' + L.states[st] : ''); $('strip').append(c); });
 }
 
 async function load() {
